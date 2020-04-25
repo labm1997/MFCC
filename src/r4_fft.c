@@ -27,11 +27,32 @@ void r4_bit_reverse_1024_copy(complex *input, complex *output){
 }
 
 /*
- * Computa a fft de input em output usando o algorítmo de fft radix-4
+ * Faz o bit-reverse radix4 de um array in-place
  */
-void r4_fft(complex *input, complex *output){
-    r4_bit_reverse_1024_copy(input, output);
+void r4_bit_reverse_1024_inplace(complex *input){
+    char reverted[SAMPLES_SIZE] = {0};
+    for(uint16_t i=0 ; i<SAMPLES_SIZE ; i++){
+        // Não inverte se já inverteu
+        if(reverted[i] != 0) continue;
 
+        // Variáveis temporárias
+        uint16_t revIndex = r4_bit_reverse_1024(i);
+        complex tmp = input[revIndex];
+
+        // Faz o swap
+        input[revIndex] = input[i];
+        input[i] = tmp;
+
+        // Indica que inverteu
+        reverted[revIndex] = 1;
+        //reverted[i] = 1; Desnecessário pq não vai passar aqui novamente
+    }
+}
+
+/*
+ * Computa a fft em output dado que output já contém o sinal bitreversed
+ */
+void r4_fft_impl(complex *output){
     // Representa a altura na árvore de recursão, começando por baixo em N=4
     for(uint16_t N=4 ; N<=SAMPLES_SIZE ; N *= 4){
         // Posição inicial nos halves
@@ -83,7 +104,22 @@ void r4_fft(complex *input, complex *output){
         }
 
     }
+}
 
+/*
+ * Computa a fft de input usando o algorítmo de fft radix-4, salva in-place
+ */
+void r4_fft(complex *signal){
+    r4_bit_reverse_1024_inplace(signal);
+    r4_fft_impl(signal);
+}
+
+/*
+ * Computa a fft de input em output usando o algorítmo de fft radix-4
+ */
+void r4_fft_copy(complex *input, complex *output){
+    r4_bit_reverse_1024_copy(input, output);
+    r4_fft_impl(output);
 }
 
 /*
@@ -92,14 +128,11 @@ void r4_fft(complex *input, complex *output){
  * @params magnitude: Tem tamanho SAMPLES_SIZE/2
  */
 void r4_fft_mag2(complex *signal, float *magnitude){
-    // Saída da FFT
-    complex output[SAMPLES_SIZE];
-
     // Computa FFT
-    r4_fft(signal, output);
+    r4_fft(signal);
 
     // Faz o computo da magnitude
     for(uint16_t i=0 ; i<SAMPLES_SIZE/2 ; i++){
-        magnitude[i] = (output[i].real*output[i].real + output[i].imag*output[i].imag) / (SAMPLES_SIZE*SAMPLES_SIZE);
+        magnitude[i] = (signal[i].real*signal[i].real + signal[i].imag*signal[i].imag) / (SAMPLES_SIZE*SAMPLES_SIZE);
     }
 }
